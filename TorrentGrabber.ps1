@@ -10,7 +10,7 @@ else {
     . $commonScript
 }
 
-function Get-TorrentRSSFeed {
+function Get-TorrentRSSFeed-ezRSS {
     [Cmdletbinding()]
     param (
         [Parameter(Mandatory)]
@@ -62,6 +62,21 @@ function Get-TorrentRSSFeed {
     }
 
     $returnObjects | select Title, Link, FileName, ContentLength, Season, Episode, Description, Hash
+}
+
+function Get-TorrentRSSFeed {
+    [Cmdletbinding()]
+    param (
+        [Parameter(Mandatory)]
+        [string]$RssUrl
+    )
+
+    if ($RssUrl -like '*ezrss.it/*') {
+        Get-TorrentRSSFeed-ezRSS -RssUrl $RssUrl
+    }
+    else {
+        Write-Error ('Unknown RSS feed, unable to parse: {0}' -f $RssUrl)
+    }
 }
 
 $shows = @(

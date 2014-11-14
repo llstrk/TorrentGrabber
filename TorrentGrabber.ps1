@@ -1,13 +1,20 @@
 ﻿Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 
-$commonScript = Join-Path $PSScriptRoot 'TorrentGrabber-TorrentObject.ps1'
+function New-TorrentObject {
+    [Cmdletbinding()]
+    param()
 
-if (-not (Test-Path $commonScript)) {
-    Write-Error ('{0} was not found' -f $commonScript)
-}
-else {
-    . $commonScript
+    New-Object -TypeName PSObject -Property @{
+        Title         = ''
+        Link          = ''
+        Description   = ''
+        FileName      = ''
+        ContentLength = 0
+        Hash          = ''
+        Season        = 0
+        Episode       = 0
+    }
 }
 
 function Get-TorrentRSSFeed-ezRSS {
@@ -35,7 +42,7 @@ function Get-TorrentRSSFeed-ezRSS {
             $newObj.Title         = $r.title.'#cdata-section'
             $newObj.Description   = $r.description.'#cdata-section'
             $newObj.Link          = $r.link
-            $newObj.FileName      = $r.torrent.FileName.'#cdata-section'
+            $newObj.FileName      = $r.torrent.FileName.'#cdata-section'.Replace('[','(').Replace(']',')')
             $newObj.ContentLength = [int]$r.torrent.ContentLength
             $newObj.Hash          = $r.torrent.InfoHash
 
@@ -64,6 +71,39 @@ function Get-TorrentRSSFeed-ezRSS {
     $returnObjects | select Title, Link, FileName, ContentLength, Season, Episode, Description, Hash
 }
 
+function Invoke-DownloadTorrentFile {
+    [Cmdletbinding()]
+    param (
+        [Parameter(Mandatory,
+                   ValueFromPipeline=$true)]
+        [PSObject[]]$TorrentObject,
+        [Parameter(Mandatory)]
+        [string]$OutDirectory
+    )
+
+    Begin {
+        if (-not (Test-Path $OutDirectory)) {
+            Write-Verbose "$OutDirectory not found, trying to create it..."
+            New-Item -ItemType Directory $OutDirectory | Out-Null
+            Write-Verbose "$OutDirectory created"
+        }
+    }
+
+    Process {
+        foreach ($t in $TorrentObject) {
+            $outfile = Join-Path 'D:\Kode\Test' $t.FileName
+
+            if (Test-Path $outfile) {
+                Write-Verbose "$outfile already exists, skipping..."
+            }
+            else {
+                Write-Verbose "Downloading $($t.FileName)"
+                Invoke-WebRequest -Uri $t.Link -OutFile $outfile
+            }
+        }
+    }
+}
+
 function Get-TorrentRSSFeed {
     [Cmdletbinding()]
     param (
@@ -90,4 +130,5 @@ $shows = @(
 
 foreach ($s in $shows) {
     (Get-TorrentRSSFeed -RssUrl $s -Verbose | measure).Count
+    Get-TorrentRSSFeed -RssUrl $s | Invoke-DownloadTorrentFile -ErrorAction Continue -Verbose -OutDirectory D:\Kode\Test
 }
